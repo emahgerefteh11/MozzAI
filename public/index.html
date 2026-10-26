@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#f7f8f2">
+  <title>MozzAI · A little help with care</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="feedback-dialog" aria-labelledby="feedback-title">
+    <form id="feedback-form">
+      <div class="section-heading"><h2 id="feedback-title">Help make this better</h2><button type="button" class="icon-button" id="close-feedback" aria-label="Close feedback">×</button></div>
+      <p id="feedback-context" class="muted"></p>
+      <label for="feedback-category">Feedback type</label>
+      <select id="feedback-category"><option value="general">General feedback</option><option value="bug">Something is broken</option><option value="suggestion">An idea or suggestion</option></select>
+      <label for="feedback-comment">What would you like us to know?</label>
+      <textarea id="feedback-comment" rows="4" maxlength="3000" placeholder="What worked? What could be clearer?"></textarea>
+      <label for="tester-name">Your name <span class="muted">(optional)</span></label>
+      <input id="tester-name" maxlength="80" autocomplete="name" placeholder="Anonymous is fine, too">
+      <p class="fine-print">Feedback is kept until an owner deletes it. Rating an answer saves that question and answer, not your full conversation.</p>
+      <p id="feedback-error" class="error" role="alert"></p>
+      <button type="submit" class="button primary" id="save-feedback">Send feedback</button>
+    </form>
+  </dialog>
+</body>
+</html>
