@@ -4,7 +4,7 @@ A mobile care guide and LLM assistant for one pet, with private sitter access an
 
 ## Included
 
-- Random private share link plus sitter code; separate owner password.
+- Random private share link plus sitter code; separate owner password. Owners can replace the link and immediately revoke existing sitter sessions.
 - Visible draft/testing banner; unknowns and corrections remain explicit.
 - Real Workers AI integration using `@cf/openai/gpt-oss-120b`, source references, and answer/suggestion/clarification labels.
 - Readable care guide during AI outages or quota exhaustion.

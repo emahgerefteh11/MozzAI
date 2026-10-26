@@ -119,6 +119,17 @@ async function showAdmin() {
   document.querySelector('#logout').onclick = logout;
   const share = await api('/api/admin/share'); document.querySelector('#share-url').value = share.url;
   await QRCode.toCanvas(document.querySelector('#qr-code'), share.url, { width: 156, margin: 2, color: { dark: '#233e32', light: '#ffffff' } });
+  const rotate = element('button', 'text-button', 'Replace link and revoke sitter sessions');
+  document.querySelector('.share-link').parentElement.append(rotate);
+  rotate.onclick = async () => {
+    if (!confirm('Replace the tester link and immediately end all sitter sessions? You will need to share the new link.')) return;
+    try {
+      const result = await api('/api/admin/rotate-link', { method: 'POST', body: JSON.stringify({ confirm: 'rotate-link' }) });
+      share.url = result.url; document.querySelector('#share-url').value = share.url;
+      await QRCode.toCanvas(document.querySelector('#qr-code'), share.url, { width: 156, margin: 2, color: { dark: '#233e32', light: '#ffffff' } });
+      toast('New link created. Previous sitter access has been revoked.');
+    } catch (error) { toast(error.message); }
+  };
   document.querySelector('#copy-link').onclick = async () => { try { await navigator.clipboard.writeText(share.url); toast('Tester link copied.'); } catch { document.querySelector('#share-url').select(); toast('Select and copy the tester link.'); } };
   document.querySelector('#delete-all').onclick = async () => { if (!confirm('Permanently delete all saved feedback?')) return; try { await api('/api/admin/feedback', { method: 'DELETE', body: JSON.stringify({ confirm: 'delete-all' }) }); await refreshFeedback(); } catch (error) { toast(error.message); } };
   await refreshFeedback();

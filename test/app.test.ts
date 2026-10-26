@@ -124,3 +124,12 @@ test('persistent login rate limits reject repeated guesses', async () => {
   for (let i = 0; i < 9; i++) last = await request('/api/login', { method: 'POST', body: { password: 'incorrect', shareToken: env.SHARE_TOKEN } });
   assert.equal(last!.status, 429);
 });
+test('owner link replacement invalidates existing sitter sessions immediately', async () => {
+  assert.equal((await request('/api/admin/rotate-link', { method: 'POST', cookie: sitterCookie, body: { confirm: 'rotate-link' } })).status, 403);
+  const response = await request('/api/admin/rotate-link', { method: 'POST', cookie: adminCookie, body: { confirm: 'rotate-link' } });
+  assert.equal(response.status, 200);
+  const result = await response.json() as { url: string };
+  assert.notEqual(result.url, origin + '/s/' + env.SHARE_TOKEN);
+  assert.equal((await request('/api/guide', { cookie: sitterCookie })).status, 401);
+  assert.equal((await request('/api/admin/feedback', { cookie: adminCookie })).status, 200);
+});

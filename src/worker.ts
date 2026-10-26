@@ -14,7 +14,7 @@ export interface Env {
   ENVIRONMENT?: string;
   DAILY_LIMIT?: string;
 }
-interface Session { kind: 'session'; role: 'sitter' | 'admin'; id: string; exp: number }
+interface Session { kind: 'session'; role: 'sitter' | 'admin'; id: string; exp: number; grant?: string }
 interface Receipt { kind: 'receipt'; question: string; answer: string; type: string; version: string; model: string; exp: number }
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 const json = (value: unknown, status = 200, headers: Record<string, string> = {}) => Response.json(value, { status, headers });
@@ -35,7 +35,16 @@ function cookie(request: Request, token: string, age: number): string { return `
 async function session(request: Request, env: Env): Promise<Session | null> {
   const token = request.headers.get('Cookie')?.split(';').map(s => s.trim()).find(s => s.startsWith(cookieName(request) + '='))?.slice(cookieName(request).length + 1);
   const value = await verify<Session>(token, env.SESSION_SECRET);
-  return value?.kind === 'session' && ['admin', 'sitter'].includes(value.role) && value.exp > seconds() ? value : null;
+  if (value?.kind !== 'session' || !['admin', 'sitter'].includes(value.role) || value.exp <= seconds()) return null;
+  if (value.role === 'sitter' && value.grant !== await opaqueKey(await shareToken(env), env.SESSION_SECRET)) return null;
+  return value;
+}
+
+async function shareToken(env: Env): Promise<string> {
+  await env.DB.prepare('INSERT OR IGNORE INTO settings (key,value) VALUES (?,?)').bind('share_token', env.SHARE_TOKEN).run();
+  const value = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('share_token').first<{ value: string }>();
+  if (!value) throw new HttpError(503, 'Sharing is awaiting setup.');
+  return value.value;
 }
 
 function configured(env: Env): boolean { return !!env.DB && env.SITTER_CODE?.length >= 6 && env.ADMIN_PASSWORD?.length >= 16 && env.SESSION_SECRET?.length >= 32 && env.SHARE_TOKEN?.length >= 16 && env.SITTER_CODE !== env.ADMIN_PASSWORD; }
@@ -91,14 +100,16 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (new URL(request.url).protocol !== 'https:' && env.ENVIRONMENT !== 'development' && env.ENVIRONMENT !== 'test') throw new HttpError(400, 'HTTPS is required.');
     if (!['GET', 'HEAD'].includes(request.method) && request.headers.get('Origin') !== url.origin) throw new HttpError(403, 'This request must come from this website.');
     if (path === '/api/login' && request.method === 'POST') {
+      await env.DB.prepare('DELETE FROM rate_limits WHERE window < ?').bind(seconds() - 86400).run();
       const ip = await opaqueKey(request.headers.get('CF-Connecting-IP') ?? 'local', env.SESSION_SECRET);
       await limit(env, 'login:' + ip, 8, 900);
       const data = await body(request);
       const role = data.role === 'admin' ? 'admin' : 'sitter';
       const password = typeof data.password === 'string' ? data.password : '';
-      const validLink = role === 'admin' || (typeof data.shareToken === 'string' && await equalSecret(data.shareToken, env.SHARE_TOKEN));
+      const currentShare = await shareToken(env);
+      const validLink = role === 'admin' || (typeof data.shareToken === 'string' && await equalSecret(data.shareToken, currentShare));
       if (!validLink || !password || password.length > 256 || !await equalSecret(password, role === 'admin' ? env.ADMIN_PASSWORD : env.SITTER_CODE)) throw new HttpError(401, 'The access details did not match. Please check with the person who shared this page.');
-      const token = await sign({ kind: 'session', role, id: crypto.randomUUID(), exp: seconds() + 43200 }, env.SESSION_SECRET);
+      const token = await sign({ kind: 'session', role, id: crypto.randomUUID(), exp: seconds() + 43200, ...(role === 'sitter' ? { grant: await opaqueKey(currentShare, env.SESSION_SECRET) } : {}) }, env.SESSION_SECRET);
       return json({ role }, 200, { 'Set-Cookie': cookie(request, token, 43200) });
     }
     if (path === '/api/logout' && request.method === 'POST') return json({ ok: true }, 200, { 'Set-Cookie': cookie(request, '', 0) });
@@ -107,7 +118,14 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (path === '/api/session' && request.method === 'GET') return json({ role: user.role });
     if (path.startsWith('/api/admin/')) {
       if (user.role !== 'admin') throw new HttpError(403, 'Owner access is required.');
-      if (path === '/api/admin/share' && request.method === 'GET') return json({ url: url.origin + '/s/' + env.SHARE_TOKEN });
+      if (path === '/api/admin/share' && request.method === 'GET') return json({ url: url.origin + '/s/' + await shareToken(env) });
+      if (path === '/api/admin/rotate-link' && request.method === 'POST') {
+        const data = await body(request);
+        if (data.confirm !== 'rotate-link') throw new HttpError(400, 'Confirm link replacement explicitly.');
+        const next = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().slice(0, 8);
+        await env.DB.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind('share_token', next).run();
+        return json({ url: url.origin + '/s/' + next });
+      }
       if (path === '/api/admin/feedback' && request.method === 'GET') {
         const rows = await env.DB.prepare('SELECT * FROM feedback ORDER BY created_at DESC LIMIT 500').all();
         return json({ items: rows.results, limit: 500 });
@@ -139,7 +157,7 @@ async function route(request: Request, env: Env): Promise<Response> {
         const answer = await Promise.race([askModel(env.AI, model, guide, messages), new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error('Timeout')), 45000); })]);
         const receipt = await sign({ kind: 'receipt', question: messages.at(-1)!.content, answer: answer.answer, type: answer.type, version: guide.version, model, exp: seconds() + 86400 }, env.SESSION_SECRET);
         return json({ ...answer, receipt, model, guideVersion: guide.version });
-      } catch { throw new HttpError(503, 'The AI could not provide a verified response right now. Please use the care guide or contact an owner. No answer has been substituted.'); }
+      } catch { throw new HttpError(503, 'The AI could not return a usable answer right now. Please use the care guide or contact an owner. No answer has been substituted.'); }
       finally { if (timeout !== undefined) clearTimeout(timeout); }
     }
     if (path === '/api/feedback' && request.method === 'POST') {

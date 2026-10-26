@@ -8,7 +8,8 @@ const token = process.env.CLOUDFLARE_API_TOKEN;
 const sitter = process.env.MOZZAI_SITTER_CODE;
 const admin = process.env.MOZZAI_ADMIN_PASSWORD;
 const guidePath = process.env.MOZZAI_GUIDE_PATH;
-if (!account || !token || !guidePath) throw new Error('Set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, and MOZZAI_GUIDE_PATH securely before deployment.');
+const missing = Object.entries({ CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_API_TOKEN: token, MOZZAI_GUIDE_PATH: guidePath }).filter(([, value]) => !value).map(([name]) => name);
+if (missing.length) throw new Error(`Configure ${missing.join(', ')} securely before deployment.`);
 if (!/^[a-f0-9]{32}$/i.test(account)) throw new Error('CLOUDFLARE_ACCOUNT_ID must be the account ID, not an email or API key.');
 if (!sitter || sitter.length < 6 || !admin || admin.length < 16 || sitter === admin) throw new Error('Set a sitter code of at least 6 characters and a different admin password of at least 16 characters through secure environment settings.');
 const name = process.env.MOZZAI_WORKER_NAME || 'mozzai-family-pilot';
@@ -17,7 +18,10 @@ if (!/^[a-z0-9-]{3,50}$/.test(name)) throw new Error('Invalid Worker name.');
 async function api(path, { method = 'GET', body } = {}) {
   const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}${path}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
   const data = await response.json();
-  if (!response.ok || !data.success) throw new Error(`Cloudflare operation failed (${response.status}, codes ${(data.errors || []).map(e => e.code).join(',')}). Check account-scoped permissions and network access.`);
+  if (!response.ok || !data.success || (Array.isArray(data.result) && data.result.some(item => item.success === false))) {
+    const error = new Error(`Cloudflare operation failed (${response.status}, codes ${(data.errors || []).map(e => e.code).join(',')}). Check account-scoped permissions and network access.`);
+    error.status = response.status; throw error;
+  }
   return data.result;
 }
 function run(args, input) {
@@ -43,7 +47,7 @@ await api(`/d1/database/${databaseId}/query`, { method: 'POST', body: { sql: 'IN
 
 // Read existing secrets by name only. Preserve link and session secrets across ordinary redeploys.
 let existing = [];
-try { existing = await api(`/workers/scripts/${name}/secrets`); } catch { /* A first deployment has no script. Secret creation below must succeed before the link is reported. */ }
+try { existing = await api(`/workers/scripts/${name}/secrets`); } catch (error) { if (error.status !== 404) throw error; }
 const secretNames = new Set(existing.map(item => item.name));
 const newShareToken = secretNames.has('SHARE_TOKEN') ? null : randomBytes(24).toString('base64url');
 const config = {

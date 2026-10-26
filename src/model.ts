@@ -34,7 +34,7 @@ export function parseAnswer(result: unknown, guide: Guide): Answer {
 export async function askModel(binding: ModelBinding, model: string, guide: Guide, messages: Message[]): Promise<Answer> {
   const system = instructions(guide);
   const input = model.startsWith('@cf/openai/gpt-oss')
-    ? { instructions: system, input: messages, max_output_tokens: 1800, reasoning: { effort: 'low' } }
+    ? { instructions: system, input: messages, max_output_tokens: 1800, reasoning: { effort: 'low' }, text: { format: { type: 'json_object' } } }
     : { messages: [{ role: 'system', content: system }, ...messages], max_tokens: 700, temperature: 0.2 };
   return parseAnswer(await binding.run(model, input), guide);
 }
