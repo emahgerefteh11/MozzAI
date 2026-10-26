@@ -1,6 +1,6 @@
 # Mozz’s sitter care guide
 
-**Status: Draft — awaiting owner approval.**
+**Status: Owner-approved.**
 Prepared from the owner interview. “Confirmed” means explicitly reported by the owner, not independently verified by a veterinarian. Unanswered questions and treatment-name uncertainty are listed separately.
 
 ## Confirmed care instructions
@@ -115,11 +115,11 @@ Prepared from the owner interview. “Confirmed” means explicitly reported by 
 
 ## Approval
 
-**Awaiting owner approval.** Approval of this draft does not fill unanswered fields or verify a medication name or dose. Owner corrections and completed contact/treatment details should be incorporated before the final sitter handoff.
+**Owner-approved in chat.** Approval covers the guide as written, including its explicitly unanswered questions and uncertainties. It does not fill unanswered fields or verify a medication name or dose. Completed contact and treatment details are still needed for the final sitter handoff.
 
 ## Handoff to the implementation chat
 
-Use this document as the owner-interview source for Mozz’s sitter guide. It is a draft, not yet owner-approved.
+Use this owner-approved document as the owner-interview source for Mozz’s sitter guide. Unanswered questions and medical uncertainties remain unresolved unless explicitly updated by the owner or treating vet.
 
 - Preserve three separate categories: owner-confirmed instructions, unanswered questions, and corrections/uncertainties.
 - Implement the current final instructions, including four-hour maximum crated time alone, frequent backyard breaks, avoiding walks, crating before unfamiliar visitors, and the emergency contact order.
@@ -127,5 +127,5 @@ Use this document as the owner-interview source for Mozz’s sitter guide. It is
 - Keep A Pup Above chicken tentative. Keep “cytisine” as unverified owner wording, not a medication order. Do not infer a Simparica Trio dose or Mozz’s weight from the link.
 - Include editable contact, clinic, medication-label/dose-log, supplies, and remaining-care fields.
 - Include the ten sitter questions above as expected-answer scenarios. Answers should remain faithful to the confirmed facts and state when information is missing.
-- Keep the guide’s approval status visible and obtain owner approval after corrections. Do not treat export as approval.
+- Keep the guide’s owner-approved status visible. Obtain renewed owner approval for subsequent substantive changes; do not treat export as approval of new changes.
 - This handoff describes content requirements; it makes no claim that an application has been built, changed, or tested.
